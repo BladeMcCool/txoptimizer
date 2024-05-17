@@ -1,0 +1,3 @@
+# Ignore the challenge_source directory
+challenge_source/
+.idea/
