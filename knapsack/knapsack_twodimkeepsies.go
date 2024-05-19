@@ -2,9 +2,9 @@ package knapsack
 
 import "fmt"
 
-type TwoDimArrayNoKeepsies struct{}
+type TwoDimArrayKeepsies struct{}
 
-func (k TwoDimArrayNoKeepsies) Run(transactions []Transaction, maxTime int) []Transaction {
+func (k TwoDimArrayKeepsies) Run(transactions []Transaction, maxTime int) []Transaction {
 	n := len(transactions)
 	fmt.Printf("looking at %d transactions, and a maxTime of %d ms ...\n", n, maxTime)
 
@@ -12,9 +12,7 @@ func (k TwoDimArrayNoKeepsies) Run(transactions []Transaction, maxTime int) []Tr
 	for i := range dp {
 		dp[i] = make([]float64, maxTime+1)
 	}
-	//fmt.Println("dp initially: %+v", dp)
 
-	// initial implementation suggestion did not do a keep array, it did it
 	// Initialize the keep array to track which items are included
 	keep := make([][]bool, n+1)
 	for i := range keep {
@@ -54,28 +52,27 @@ func (k TwoDimArrayNoKeepsies) Run(transactions []Transaction, maxTime int) []Tr
 	// Find the selected transactions
 	res := []Transaction{}
 	t := maxTime
-	for i := n; i > 0; i-- {
-		//fmt.Printf("i: %d, t: %d\n", i, t)
-		if dp[i][t] != dp[i-1][t] {
-			res = append(res, transactions[i-1])
-			t -= transactions[i-1].ProcessingTime
-			//	fmt.Printf("appended selected tx, t is now: %d\n", t)
-			//} else {
-			//	fmt.Printf("did nothing because %.2f == %.2f\n", dp[i][t], dp[i-1][t])
-		}
-	}
-	return res
+	//for i := n; i > 0; i-- {
+	//	//fmt.Printf("i: %d, t: %d\n", i, t)
+	//	if dp[i][t] != dp[i-1][t] {
+	//		res = append(res, transactions[i-1])
+	//		t -= transactions[i-1].ProcessingTime
+	//		//	fmt.Printf("appended selected tx, t is now: %d\n", t)
+	//		//} else {
+	//		//	fmt.Printf("did nothing because %.2f == %.2f\n", dp[i][t], dp[i-1][t])
+	//	}
+	//}
+	//return res
 	//_ = res
 	//
 	//t = maxTime
-	//altRes := []Transaction{}
-	//for i := n; i >= 0; i-- {
-	//	//fmt.Printf("i: %d t: %d, keep[i][t]: %t\n", i, t, keep[i][t])
-	//	if keep[i][t] {
-	//		altRes = append(altRes, transactions[i-1])
-	//		t -= transactions[i-1].ProcessingTime
-	//	}
-	//}
+	for i := n; i >= 0; i-- {
+		//fmt.Printf("i: %d t: %d, keep[i][t]: %t\n", i, t, keep[i][t])
+		if keep[i][t] {
+			res = append(res, transactions[i-1])
+			t -= transactions[i-1].ProcessingTime
+		}
+	}
 	//panic("stop here")
-	//return dp[n][maxTime], altRes
+	return res
 }

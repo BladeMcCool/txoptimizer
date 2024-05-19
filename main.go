@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/csv"
 	"encoding/json"
+	"flag"
 	"fmt"
 	//"github.com/mattschofield/go-knapsack"
 	"log"
@@ -19,45 +20,70 @@ import (
 //	return int64(t.Amount)
 //}
 
+// TODO
+//*  make the function prioritize(transaction []Transaction, totalTime=1000): []Transaction {} function be what is called from main
+//* it will load the resources and call the one dimensional version
+// * main will report the max USD Value of this as well.
+// * main should have cli arg to set total time. run it with all the options see the output looks right.
+// * make a test file
+// * make a interface for this just the useLibraryKnapsack(transactions []Transaction, maxTime int) ([]Transaction)
+// * do the max value calc outside of the implementation, loop over the tx to do that in maybe a knapsackprioritizer that can take the tx and latency things and can be given a particular interface implementation of knapsackalgo and then .Run it
+// * make a small in memory fixture of test data with expected results for a unit test
+// * use the fixture on 3 different implementations in the test file, each one just a same thing with knapsackprioritizer getting a different knapsackalgo passed to it
+// make sure everything is clean and then
+// make variable names consistent eg totalTime
+// * determine if i really does need to return the updated tx after adding latency or can i edit them in place?
+// invite the ppl to the repo
+
 // LatencyMapping represents the mapping of country codes to processing times
 type LatencyMapping map[string]int
 
 func main() {
+	// Define command line arguments with default values
+	csvFilePath := flag.String("csvFilePath", "challenge_source/transactions.csv", "Path to the input transactions CSV file")
+	jsonFilePath := flag.String("jsonFilePath", "challenge_source/latencies.json", "Path to the latency mapping JSON file")
+	totalTime := flag.Int("totalTime", 1000, "Total processing time available, in milliseconds")
+
+	// Parse command line arguments
+	flag.Parse()
 
 	//get a number of ms, tx and latency files from cli args, with some defaults
 
 	// Paths to the input files
-	csvFilePath := "challenge_source/transactions.csv"
-	//csvFilePath := "challenge_source/transactions_mini.csv"
-	jsonFilePath := "challenge_source/latencies.json"
-	totalTime := 1000
+	//csvFilePath := "challenge_source/transactions.csv"
+	////csvFilePath := "challenge_source/transactions_mini.csv"
+	//jsonFilePath := "challenge_source/latencies.json"
+	//totalTime := 1000
 
 	// Read the latencies from the JSON file
-	latencies, err := readLatencies(jsonFilePath)
+	latencies, err := readLatencies(*jsonFilePath)
 	if err != nil {
 		log.Fatalf("failed to read latencies: %v", err)
 	}
 
 	// Read the transactions from the CSV file
-	transactions, err := readTransactions(csvFilePath)
+	transactions, err := readTransactions(*csvFilePath)
 	if err != nil {
 		log.Fatalf("failed to read transactions: %v", err)
 	}
 
 	// Update tx with latency predictions
-	latencyUpdatedTransactions := updateTxWithLatency(transactions, latencies)
+	updateTxWithLatency(transactions, latencies)
 
 	// Get the selected transactions
-	selectedTransactions := prioritize(latencyUpdatedTransactions, totalTime)
+	selectedTransactions := prioritize(transactions, *totalTime)
 
 	// Calculate the total value
 	totalValue := 0.0
+	totalMsUsed := 0
 	for _, transaction := range selectedTransactions {
 		totalValue += transaction.Amount
+		totalMsUsed += transaction.ProcessingTime
 	}
 
 	// Output the results
 	fmt.Printf("Max USD value: %.2f\n", totalValue)
+	fmt.Printf("consuming total MS time: %d\n", totalMsUsed)
 	fmt.Println("Selected transactions:")
 	for _, transaction := range selectedTransactions {
 		fmt.Printf("ID: %s, Amount: %.2f, Processing Time: %d\n", transaction.ID, transaction.Amount, transaction.ProcessingTime)
@@ -71,63 +97,6 @@ func main() {
 	//	// Run the knapsack function for each time option
 	//	runKnapsack(transactions, maxTime)
 	//}
-}
-
-func updateTxWithLatency(transactions []knapsack.Transaction, latencies LatencyMapping) []knapsack.Transaction {
-	// Add processing time and value per ms to each transaction
-	for i := range transactions {
-		if latency, exists := latencies[transactions[i].BankCountryCode]; exists {
-			transactions[i].TxNum = i + 1 //for debug easier to look at than uuid
-			transactions[i].ProcessingTime = latency
-		} else {
-			log.Fatalf("no latency found for country code: %s", transactions[i].BankCountryCode)
-		}
-	}
-	return transactions
-}
-
-func prioritize(transaction []knapsack.Transaction, totalTime int) []knapsack.Transaction {
-
-	// Create a knapsack prioritizer with the TwoDimArrayNoKeepsies implementation
-	prioritizer := knapsack.KnapsackPrioritizer{Algorithm: knapsack.TwoDimArrayNoKeepsies{}}
-	return prioritizer.Run(transaction, totalTime)
-}
-
-func runKnapsack(transactions []knapsack.Transaction, maxTime int) {
-	maxAmount, selectedTransactions := myknapsack(transactions, maxTime)
-
-	fmt.Printf("For max time %d ms:\n", maxTime)
-	fmt.Printf("Max amount: %.2f\n", maxAmount)
-	fmt.Println("Selected transactions:")
-	for _, transaction := range selectedTransactions {
-		fmt.Println(transaction)
-	}
-
-	//maxAmountGreedy, selectedTransactionsGreedy := greedyKnapsack(transactions, maxTime)
-	//
-	//fmt.Printf("Greedy Max amount: %.2f\n", maxAmountGreedy)
-	//fmt.Println("Greedy Selected transactions:")
-	//for _, transaction := range selectedTransactionsGreedy {
-	//	fmt.Println(transaction)
-	//}
-
-	maxAmountOneD, selectedTransactionsOneD := onedimensionalknapsack(transactions, maxTime)
-
-	fmt.Printf("OneD Max amount: %.2f\n", maxAmountOneD)
-	fmt.Printf("OneD Selected transactions (count: %d):\n", len(selectedTransactionsOneD))
-	for _, transaction := range selectedTransactionsOneD {
-		fmt.Println(transaction)
-	}
-
-	//maxAmtLib, selectedTxLib := useLibraryKnapsack(transactions, maxTime)
-	//
-	//fmt.Printf("Library Knapsack Max amount: %.2f\n", maxAmtLib)
-	//fmt.Printf("Library Knapsack transactions (count: %d):\n", len(selectedTxLib))
-	//for _, transaction := range selectedTxLib {
-	//	fmt.Println(transaction)
-	//}
-
-	fmt.Println("----------------------")
 }
 
 // readLatencies reads the latency mapping from a JSON file
@@ -184,149 +153,222 @@ func readTransactions(filePath string) ([]knapsack.Transaction, error) {
 	return transactions, nil
 }
 
-// Knapsack problem solution
-func myknapsack(transactions []knapsack.Transaction, maxTime int) (float64, []knapsack.Transaction) {
+//func updateTxWithLatency(transactions []knapsack.Transaction, latencies LatencyMapping) []knapsack.Transaction {
+//	// Add processing time and value per ms to each transaction
+//	for i := range transactions {
+//		if latency, exists := latencies[transactions[i].BankCountryCode]; exists {
+//			transactions[i].TxNum = i + 1 //for debug easier to look at than uuid
+//			transactions[i].ProcessingTime = latency
+//		} else {
+//			log.Fatalf("no latency found for country code: %s", transactions[i].BankCountryCode)
+//		}
+//	}
+//	return transactions
+//}
 
-	n := len(transactions)
-	fmt.Printf("looking at %d transactions, and a maxTime of %d ms ...\n", n, maxTime)
-
-	dp := make([][]float64, n+1)
-	for i := range dp {
-		dp[i] = make([]float64, maxTime+1)
-	}
-	//fmt.Println("dp initially: %+v", dp)
-
-	// initial implementation suggestion did not do a keep array, it did it
-	// Initialize the keep array to track which items are included
-	keep := make([][]bool, n+1)
-	for i := range keep {
-		keep[i] = make([]bool, maxTime+1)
-	}
-
-	for i := 1; i <= n; i++ {
-		for t := 1; t <= maxTime; t++ {
-			if transactions[i-1].ProcessingTime <= t {
-				dp[i][t] = max(dp[i-1][t], dp[i-1][t-transactions[i-1].ProcessingTime]+transactions[i-1].Amount)
-
-				///not normally doing this lol
-				if dp[i-1][t] < dp[i-1][t-transactions[i-1].ProcessingTime]+transactions[i-1].Amount {
-					//fmt.Printf("KEEP i: %d and t: %d: choose %.2f vs %.2f (= %.2f + %.2f) -- we chose %.2f\n", i, t, dp[i-1][t], dp[i-1][t-transactions[i-1].ProcessingTime]+transactions[i-1].Amount, dp[i-1][t-transactions[i-1].ProcessingTime], transactions[i-1].Amount, dp[i][t])
-					keep[i][t] = true
-				}
-
-				//fmt.Printf("i: %d and t: %d: choose %.2f vs %.2f (= %.2f + %.2f) -- we chose %.2f\n", i, t, dp[i-1][t], dp[i-1][t-transactions[i-1].ProcessingTime]+transactions[i-1].Amount, dp[i-1][t-transactions[i-1].ProcessingTime], transactions[i-1].Amount, dp[i][t])
-				//fmt.Printf("fookin wot: %+v\n", dp[i-1])
-				//fmt.Printf("fookin wot2: %+v\n", dp[i-1][t-transactions[i-1].ProcessingTime])
-				//panic("just stop")
-			} else {
-				//fmt.Printf("i: %d and t: %d and we had to skip b/c processingtime for this tx is: %d\n", i, t, transactions[i-1].ProcessingTime)
-				dp[i][t] = dp[i-1][t]
-			}
-		}
-		//fmt.Printf("dp after populating for tx #%d: %+v\n\n", i, dp)
-	}
-	//for i, v := range dp {
-	//	fmt.Printf("dp row %d after populating: %+v\n", i, v)
-	//}
-	//for i, tx := range transactions {
-	//	fmt.Printf("txid: %s -> keep timeslots: %+v\n", tx.ID, keep[i+1])
-	//}
-
-	// Find the selected transactions
-	res := []knapsack.Transaction{}
-	t := maxTime
-	for i := n; i > 0; i-- {
-		//fmt.Printf("i: %d, t: %d\n", i, t)
-		if dp[i][t] != dp[i-1][t] {
-			res = append(res, transactions[i-1])
-			t -= transactions[i-1].ProcessingTime
-			//	fmt.Printf("appended selected tx, t is now: %d\n", t)
-			//} else {
-			//	fmt.Printf("did nothing because %.2f == %.2f\n", dp[i][t], dp[i-1][t])
+func updateTxWithLatency(transactions []knapsack.Transaction, latencies LatencyMapping) {
+	// Add processing time and value per ms to each transaction
+	for i := range transactions {
+		if latency, exists := latencies[transactions[i].BankCountryCode]; exists {
+			transactions[i].TxNum = i + 1 //for debug easier to look at than uuid
+			transactions[i].ProcessingTime = latency
+		} else {
+			log.Fatalf("no latency found for country code: %s", transactions[i].BankCountryCode)
 		}
 	}
-	_ = res
-
-	t = maxTime
-	altRes := []knapsack.Transaction{}
-	for i := n; i >= 0; i-- {
-		//fmt.Printf("i: %d t: %d, keep[i][t]: %t\n", i, t, keep[i][t])
-		if keep[i][t] {
-			altRes = append(altRes, transactions[i-1])
-			t -= transactions[i-1].ProcessingTime
-		}
-	}
-	//panic("stop here")
-	return dp[n][maxTime], altRes
 }
 
-func onedimensionalknapsack(transactions []knapsack.Transaction, maxTime int) (float64, []knapsack.Transaction) {
-	//n := len(transactions)
-	//dp := make([]float64, maxTime+1)
-	//
-	//// Fill the dp array
-	//for i := 0; i < n; i++ {
-	//	fmt.Printf("tx: %+v\n", transactions[i])
-	//	for t := maxTime; t >= transactions[i].ProcessingTime; t-- {
-	//		fmt.Printf("t: @%dms, dp[t]: $%.2f, t-transactions[i].ProcessingTime: @%dms, dp[t-transactions[i].ProcessingTime]: $%.2f, transactions[i].Amount: $%.2f (dp[t-transactions[i].ProcessingTime] + transactions[i].Amount: $%.2f)\n", t, dp[t], t-transactions[i].ProcessingTime, dp[t-transactions[i].ProcessingTime], transactions[i].Amount, dp[t-transactions[i].ProcessingTime]+transactions[i].Amount)
-	//		dp[t] = max(dp[t], dp[t-transactions[i].ProcessingTime]+transactions[i].Amount)
-	//	}
-	//	fmt.Printf("after tx %d, dp looks like:%+v\n", i, dp)
-	//}
-	//
-	//// Traceback to find the selected transactions
-	//totalAmount := dp[maxTime]
-	//selectedTransactions := []Transaction{}
-	//t := maxTime
-	//for i := n - 1; i >= 0 && t > 0; i-- {
-	//	if t >= transactions[i].ProcessingTime && dp[t] == dp[t-transactions[i].ProcessingTime]+transactions[i].Amount {
-	//		selectedTransactions = append(selectedTransactions, transactions[i])
-	//		t -= transactions[i].ProcessingTime
-	//	}
-	//}
-	//
-	//return totalAmount, selectedTransactions
+func prioritize(transaction []knapsack.Transaction, totalTime int) []knapsack.Transaction {
 
-	n := len(transactions)
-	dp := make([]float64, maxTime+1)
-	keep := make([][]bool, n)
-
-	// Initialize the keep array to track which items are included
-	for i := range keep {
-		keep[i] = make([]bool, maxTime+1)
-	}
-
-	// Fill the dp array and keep track of decisions
-	for i := 0; i < n; i++ {
-		for t := maxTime; t >= transactions[i].ProcessingTime; t-- {
-			if dp[t] < dp[t-transactions[i].ProcessingTime]+transactions[i].Amount {
-				dp[t] = dp[t-transactions[i].ProcessingTime] + transactions[i].Amount
-				//fmt.Printf("keep: i: %d t: %d tx: %+v\n", i, t, transactions[i])
-
-				keep[i][t] = true
-			}
-		}
-	}
-
-	//for tx, v := range keep {
-	//	fmt.Printf("txid: %s -> keep timeslots: %+v\n", transactions[tx].ID, v)
-	//}
-
-	totalAmount := dp[maxTime]
-	selectedTransactions := []knapsack.Transaction{}
-
-	//Determine which ones we actually sent by walking the timeslots back. In reverse order of tx processing
-	t := maxTime
-	for i := n - 1; i >= 0; i-- {
-		//fmt.Printf("i: %d t: %d, keep[i][t]: %t\n", i, t, keep[i][t])
-		if keep[i][t] {
-			selectedTransactions = append(selectedTransactions, transactions[i])
-			t -= transactions[i].ProcessingTime
-		}
-	}
-
-	return totalAmount, selectedTransactions
+	// Create a knapsack prioritizer with the TwoDimArrayNoKeepsies implementation
+	//prioritizer := knapsack.KnapsackPrioritizer{Algorithm: knapsack.TwoDimArrayNoKeepsies{}}
+	//prioritizer := knapsack.KnapsackPrioritizer{Algorithm: knapsack.TwoDimArrayKeepsies{}}
+	prioritizer := knapsack.KnapsackPrioritizer{Algorithm: knapsack.OneDimArrayKeepsies{}}
+	return prioritizer.Run(transaction, totalTime)
 }
+
+//
+//func runKnapsack(transactions []knapsack.Transaction, maxTime int) {
+//	maxAmount, selectedTransactions := myknapsack(transactions, maxTime)
+//
+//	fmt.Printf("For max time %d ms:\n", maxTime)
+//	fmt.Printf("Max amount: %.2f\n", maxAmount)
+//	fmt.Println("Selected transactions:")
+//	for _, transaction := range selectedTransactions {
+//		fmt.Println(transaction)
+//	}
+//
+//	//maxAmountGreedy, selectedTransactionsGreedy := greedyKnapsack(transactions, maxTime)
+//	//
+//	//fmt.Printf("Greedy Max amount: %.2f\n", maxAmountGreedy)
+//	//fmt.Println("Greedy Selected transactions:")
+//	//for _, transaction := range selectedTransactionsGreedy {
+//	//	fmt.Println(transaction)
+//	//}
+//
+//	maxAmountOneD, selectedTransactionsOneD := onedimensionalknapsack(transactions, maxTime)
+//
+//	fmt.Printf("OneD Max amount: %.2f\n", maxAmountOneD)
+//	fmt.Printf("OneD Selected transactions (count: %d):\n", len(selectedTransactionsOneD))
+//	for _, transaction := range selectedTransactionsOneD {
+//		fmt.Println(transaction)
+//	}
+//
+//	//maxAmtLib, selectedTxLib := useLibraryKnapsack(transactions, maxTime)
+//	//
+//	//fmt.Printf("Library Knapsack Max amount: %.2f\n", maxAmtLib)
+//	//fmt.Printf("Library Knapsack transactions (count: %d):\n", len(selectedTxLib))
+//	//for _, transaction := range selectedTxLib {
+//	//	fmt.Println(transaction)
+//	//}
+//
+//	fmt.Println("----------------------")
+//}
+
+//
+//// Knapsack problem solution
+//func myknapsack(transactions []knapsack.Transaction, maxTime int) (float64, []knapsack.Transaction) {
+//
+//	n := len(transactions)
+//	fmt.Printf("looking at %d transactions, and a maxTime of %d ms ...\n", n, maxTime)
+//
+//	dp := make([][]float64, n+1)
+//	for i := range dp {
+//		dp[i] = make([]float64, maxTime+1)
+//	}
+//	//fmt.Println("dp initially: %+v", dp)
+//
+//	// initial implementation suggestion did not do a keep array, it did it
+//	// Initialize the keep array to track which items are included
+//	keep := make([][]bool, n+1)
+//	for i := range keep {
+//		keep[i] = make([]bool, maxTime+1)
+//	}
+//
+//	for i := 1; i <= n; i++ {
+//		for t := 1; t <= maxTime; t++ {
+//			if transactions[i-1].ProcessingTime <= t {
+//				dp[i][t] = max(dp[i-1][t], dp[i-1][t-transactions[i-1].ProcessingTime]+transactions[i-1].Amount)
+//
+//				///not normally doing this lol
+//				if dp[i-1][t] < dp[i-1][t-transactions[i-1].ProcessingTime]+transactions[i-1].Amount {
+//					//fmt.Printf("KEEP i: %d and t: %d: choose %.2f vs %.2f (= %.2f + %.2f) -- we chose %.2f\n", i, t, dp[i-1][t], dp[i-1][t-transactions[i-1].ProcessingTime]+transactions[i-1].Amount, dp[i-1][t-transactions[i-1].ProcessingTime], transactions[i-1].Amount, dp[i][t])
+//					keep[i][t] = true
+//				}
+//
+//				//fmt.Printf("i: %d and t: %d: choose %.2f vs %.2f (= %.2f + %.2f) -- we chose %.2f\n", i, t, dp[i-1][t], dp[i-1][t-transactions[i-1].ProcessingTime]+transactions[i-1].Amount, dp[i-1][t-transactions[i-1].ProcessingTime], transactions[i-1].Amount, dp[i][t])
+//				//fmt.Printf("fookin wot: %+v\n", dp[i-1])
+//				//fmt.Printf("fookin wot2: %+v\n", dp[i-1][t-transactions[i-1].ProcessingTime])
+//				//panic("just stop")
+//			} else {
+//				//fmt.Printf("i: %d and t: %d and we had to skip b/c processingtime for this tx is: %d\n", i, t, transactions[i-1].ProcessingTime)
+//				dp[i][t] = dp[i-1][t]
+//			}
+//		}
+//		//fmt.Printf("dp after populating for tx #%d: %+v\n\n", i, dp)
+//	}
+//	//for i, v := range dp {
+//	//	fmt.Printf("dp row %d after populating: %+v\n", i, v)
+//	//}
+//	//for i, tx := range transactions {
+//	//	fmt.Printf("txid: %s -> keep timeslots: %+v\n", tx.ID, keep[i+1])
+//	//}
+//
+//	// Find the selected transactions
+//	res := []knapsack.Transaction{}
+//	t := maxTime
+//	for i := n; i > 0; i-- {
+//		//fmt.Printf("i: %d, t: %d\n", i, t)
+//		if dp[i][t] != dp[i-1][t] {
+//			res = append(res, transactions[i-1])
+//			t -= transactions[i-1].ProcessingTime
+//			//	fmt.Printf("appended selected tx, t is now: %d\n", t)
+//			//} else {
+//			//	fmt.Printf("did nothing because %.2f == %.2f\n", dp[i][t], dp[i-1][t])
+//		}
+//	}
+//	_ = res
+//
+//	t = maxTime
+//	altRes := []knapsack.Transaction{}
+//	for i := n; i >= 0; i-- {
+//		//fmt.Printf("i: %d t: %d, keep[i][t]: %t\n", i, t, keep[i][t])
+//		if keep[i][t] {
+//			altRes = append(altRes, transactions[i-1])
+//			t -= transactions[i-1].ProcessingTime
+//		}
+//	}
+//	//panic("stop here")
+//	return dp[n][maxTime], altRes
+//}
+//
+//func onedimensionalknapsack(transactions []knapsack.Transaction, maxTime int) (float64, []knapsack.Transaction) {
+//	//n := len(transactions)
+//	//dp := make([]float64, maxTime+1)
+//	//
+//	//// Fill the dp array
+//	//for i := 0; i < n; i++ {
+//	//	fmt.Printf("tx: %+v\n", transactions[i])
+//	//	for t := maxTime; t >= transactions[i].ProcessingTime; t-- {
+//	//		fmt.Printf("t: @%dms, dp[t]: $%.2f, t-transactions[i].ProcessingTime: @%dms, dp[t-transactions[i].ProcessingTime]: $%.2f, transactions[i].Amount: $%.2f (dp[t-transactions[i].ProcessingTime] + transactions[i].Amount: $%.2f)\n", t, dp[t], t-transactions[i].ProcessingTime, dp[t-transactions[i].ProcessingTime], transactions[i].Amount, dp[t-transactions[i].ProcessingTime]+transactions[i].Amount)
+//	//		dp[t] = max(dp[t], dp[t-transactions[i].ProcessingTime]+transactions[i].Amount)
+//	//	}
+//	//	fmt.Printf("after tx %d, dp looks like:%+v\n", i, dp)
+//	//}
+//	//
+//	//// Traceback to find the selected transactions
+//	//totalAmount := dp[maxTime]
+//	//selectedTransactions := []Transaction{}
+//	//t := maxTime
+//	//for i := n - 1; i >= 0 && t > 0; i-- {
+//	//	if t >= transactions[i].ProcessingTime && dp[t] == dp[t-transactions[i].ProcessingTime]+transactions[i].Amount {
+//	//		selectedTransactions = append(selectedTransactions, transactions[i])
+//	//		t -= transactions[i].ProcessingTime
+//	//	}
+//	//}
+//	//
+//	//return totalAmount, selectedTransactions
+//
+//	n := len(transactions)
+//	dp := make([]float64, maxTime+1)
+//	keep := make([][]bool, n)
+//
+//	// Initialize the keep array to track which items are included
+//	for i := range keep {
+//		keep[i] = make([]bool, maxTime+1)
+//	}
+//
+//	// Fill the dp array and keep track of decisions
+//	for i := 0; i < n; i++ {
+//		for t := maxTime; t >= transactions[i].ProcessingTime; t-- {
+//			if dp[t] < dp[t-transactions[i].ProcessingTime]+transactions[i].Amount {
+//				dp[t] = dp[t-transactions[i].ProcessingTime] + transactions[i].Amount
+//				//fmt.Printf("keep: i: %d t: %d tx: %+v\n", i, t, transactions[i])
+//
+//				keep[i][t] = true
+//			}
+//		}
+//	}
+//
+//	//for tx, v := range keep {
+//	//	fmt.Printf("txid: %s -> keep timeslots: %+v\n", transactions[tx].ID, v)
+//	//}
+//
+//	totalAmount := dp[maxTime]
+//	selectedTransactions := []knapsack.Transaction{}
+//
+//	//Determine which ones we actually sent by walking the timeslots back. In reverse order of tx processing
+//	t := maxTime
+//	for i := n - 1; i >= 0; i-- {
+//		//fmt.Printf("i: %d t: %d, keep[i][t]: %t\n", i, t, keep[i][t])
+//		if keep[i][t] {
+//			selectedTransactions = append(selectedTransactions, transactions[i])
+//			t -= transactions[i].ProcessingTime
+//		}
+//	}
+//
+//	return totalAmount, selectedTransactions
+//}
 
 // Function to use the library Knapsack function
 //func useLibraryKnapsack(transactions []knapsack.Transaction, maxTime int) (float64, []knapsack.Transaction) {
@@ -376,12 +418,12 @@ func onedimensionalknapsack(transactions []knapsack.Transaction, maxTime int) (f
 //	return totalAmount, selectedTransactions
 //}
 
-func max(a, b float64) float64 {
-	if a > b {
-		return a
-	}
-	return b
-}
+//func max(a, b float64) float64 {
+//	if a > b {
+//		return a
+//	}
+//	return b
+//}
 
 //
 //// Knapsack uses a dynamic programming pattern to calculate the maximum value
@@ -478,18 +520,3 @@ func max(a, b float64) float64 {
 //
 //	return indices
 //}
-
-// TODO
-// make the function prioritize(transaction []Transaction, totalTime=1000): []Transaction {} function be what is called from main
-// it will load the resources and call the one dimensional version
-// main will report the max USD Value of this as well.
-// main should have cli arg to set total time. run it with all the options see the output looks right.
-// make a test file
-// make a interface for this just the useLibraryKnapsack(transactions []Transaction, maxTime int) ([]Transaction)
-// do the max value calc outside of the implementation, loop over the tx to do that in maybe a knapsackprioritizer that can take the tx and latency things and can be given a particular interface implementation of knapsackalgo and then .Run it
-// make a small in memory fixture of test data with expected results for a unit test
-// use the fixture on 3 different implementations in the test file, each one just a same thing with knapsackprioritizer getting a different knapsackalgo passed to it
-// make sure everything is clean and then
-// make variable names consistent eg totalTime
-// determine if i really does need to return the updated tx after adding latency or can i edit them in place?
-// invite the ppl to the repo
