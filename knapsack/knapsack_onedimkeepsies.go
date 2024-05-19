@@ -21,9 +21,9 @@ func (k OneDimArrayKeepsies) Run(transactions []Transaction, maxTime int) []Tran
 			}
 		}
 	}
-	selectedTransactions := []Transaction{}
 
 	//Determine which ones we actually sent by walking the timeslots back. In reverse order of tx processing
+	selectedTransactions := []Transaction{}
 	t := maxTime
 	for i := n - 1; i >= 0; i-- {
 		if keep[i][t] {
