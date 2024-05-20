@@ -123,6 +123,6 @@ func updateTxWithLatency(transactions []knapsack.Transaction, latencies LatencyM
 
 func prioritize(transaction []knapsack.Transaction, totalTime int) []knapsack.Transaction {
 	// Create a knapsack prioritizer with the desired implementation, then run it.
-	prioritizer := knapsack.KnapsackPrioritizer{Algorithm: knapsack.TwoDimArrayKeepsies{}}
+	prioritizer := knapsack.KnapsackPrioritizer{Algorithm: knapsack.OneDimArrayKeepsies{}}
 	return prioritizer.Run(transaction, totalTime)
 }

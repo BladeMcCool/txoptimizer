@@ -10,7 +10,7 @@ I tried out several implementations before settling on the single dimensional da
 
 https://www.youtube.com/watch?v=EH6h7WA7sDw
 
-The implementation I ended up with was similar to this.
+This is similar to one of the implementations I tried.
 
 ## The answers 
 
