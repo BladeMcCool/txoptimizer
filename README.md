@@ -5,7 +5,6 @@
 [Full problem description can be found here](challenge_source/fp%20transaction%20processing%20task.md)  
 TLDR: "Find the best set of transactions we can send within the allotted time" 
 Spent a weekend researching this, understanding the logic and settling on an implementation to submit.
-This was the take-home challenge for 
 
 ## My Approach
 
