@@ -3,8 +3,8 @@
 ### FingerPrint take home assessment - 2024-05-19 (May 19 2024)
 
 [Full problem description can be found here](challenge_source/fp%20transaction%20processing%20task.md)  
-TLDR: "Find the best set of transactions we can send within the allotted time" 
-Spent a weekend researching this, understanding the logic and settling on an implementation to submit.
+TLDR: "Find the best set of transactions we can send within the allotted time"  
+I spent roughly a weekend researching this, understanding the logic and settling on an implementation to submit.
 
 ## My Approach
 
